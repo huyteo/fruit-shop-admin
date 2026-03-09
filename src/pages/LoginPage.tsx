@@ -43,7 +43,6 @@ export default function LoginPage() {
           <Title level={2} style={{ margin: 0 }}>
             🍉 Fruit Shop
           </Title>
-          <p style={{ color: '#888' }}>Trang quản trị</p>
         </div>
 
         <Form layout="vertical" onFinish={onFinish} autoComplete="off">
