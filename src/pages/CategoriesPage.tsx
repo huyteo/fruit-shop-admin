@@ -21,6 +21,7 @@ import {
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 import axiosClient from '../api/axiosClient';
+import { getImageUrl } from '../utils/image';
 
 interface Category {
   id: number;
@@ -31,7 +32,6 @@ interface Category {
   createdAt: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 function StatusBadge({ active }: { active: boolean }) {
   const s = active
@@ -113,7 +113,7 @@ export default function CategoriesPage() {
           uid: '-1',
           name: 'image',
           status: 'done',
-          url: `${API_URL}${category.image}`,
+          url: getImageUrl(category.image),
         },
       ]);
     } else {
@@ -219,7 +219,7 @@ export default function CategoriesPage() {
       render: (image: string) =>
         image ? (
           <Image
-            src={`${API_URL}${image}`}
+            src={getImageUrl(image)}
             width={56}
             height={56}
             style={{ objectFit: 'cover', borderRadius: 10 }}

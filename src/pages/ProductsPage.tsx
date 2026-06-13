@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 import axiosClient from '../api/axiosClient';
+import { getImageUrl } from '../utils/image';
 
 interface Product {
   id: number;
@@ -183,7 +184,7 @@ export default function ProductsPage() {
           uid: '-1',
           name: 'thumbnail',
           status: 'done',
-          url: `${API_URL}${product.thumbnail}`,
+          url: getImageUrl(product.thumbnail),
         },
       ]);
     } else {
@@ -196,7 +197,7 @@ export default function ProductsPage() {
           uid: `-${index + 2}`,
           name: `image-${index}`,
           status: 'done' as const,
-          url: `${API_URL}${img}`,
+          url: getImageUrl(img),
         })),
       );
     } else {
@@ -314,7 +315,7 @@ export default function ProductsPage() {
       render: (thumbnail: string) =>
         thumbnail ? (
           <Image
-            src={`${API_URL}${thumbnail}`}
+            src={getImageUrl(thumbnail)}
             width={52}
             height={52}
             style={{ objectFit: 'cover', borderRadius: 10 }}

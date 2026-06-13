@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Table, Tag, Button, message, Avatar, Popconfirm } from 'antd';
 import { UserOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
 import axiosClient from '../api/axiosClient';
+import { getImageUrl } from '../utils/image';
 
 interface User {
   id: number;
@@ -15,7 +16,6 @@ interface User {
   createdAt: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -67,7 +67,7 @@ export default function UsersPage() {
       width: 70,
       render: (avatar: string) => (
         <Avatar
-          src={avatar ? `${API_URL}${avatar}` : undefined}
+          src={avatar ? getImageUrl(avatar) : undefined}
           icon={!avatar ? <UserOutlined /> : undefined}
         />
       ),
