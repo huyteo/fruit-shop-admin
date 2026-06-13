@@ -20,11 +20,8 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const [loading] = useState(false);
 
   const login = async (email: string, password: string) => {
-    const response = await axiosClient.post('/auth/login', {
-      email,
-      password,
-    });
-
+  try {
+    const response = await axiosClient.post('/auth/login', { email, password });
     const { user: userData, accessToken } = response.data;
 
     if (userData.role !== 'admin') {
@@ -34,7 +31,16 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('user', JSON.stringify(userData));
     setUser(userData);
-  };
+  } catch (err: unknown) {
+    // Nếu là lỗi mình tự ném (sai quyền admin) thì giữ nguyên message
+    if (err instanceof Error && err.message.includes('quyền truy cập')) {
+      throw err;
+    }
+    // Lỗi từ API (sai email/mật khẩu) → lấy message từ backend
+    const e = err as { response?: { data?: { message?: string } } };
+    throw new Error(e.response?.data?.message || 'Email hoặc mật khẩu không đúng');
+  }
+};
 
   const logout = () => {
     localStorage.removeItem('accessToken');

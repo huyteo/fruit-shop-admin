@@ -10,10 +10,10 @@ import {
   Switch,
   Space,
   message,
-  Popconfirm,
   Image,
   Upload,
   Tag,
+  Tooltip,
   Row,
   Col,
 } from 'antd';
@@ -23,6 +23,7 @@ import {
   DeleteOutlined,
   UploadOutlined,
   SearchOutlined,
+  ExclamationCircleFilled,
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 import axiosClient from '../api/axiosClient';
@@ -37,6 +38,7 @@ interface Product {
   stock: number;
   unit: string;
   isActive: boolean;
+  isFeatured: boolean;
   categoryId: number;
   createdAt: string;
   category: {
@@ -49,8 +51,40 @@ interface Category {
   id: number;
   name: string;
 }
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
-const API_URL = 'http://localhost:3000';
+function StatusBadge({ active }: { active: boolean }) {
+  const s = active
+    ? { bg: '#f6ffed', text: '#389e0d', dot: '#52c41a', label: 'Hiển thị' }
+    : { bg: '#fff1f0', text: '#cf1322', dot: '#ff4d4f', label: 'Ẩn' };
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        background: s.bg,
+        color: s.text,
+        padding: '4px 12px',
+        borderRadius: 20,
+        fontSize: 12,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: s.dot,
+          display: 'inline-block',
+        }}
+      />
+      {s.label}
+    </span>
+  );
+}
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -67,7 +101,8 @@ export default function ProductsPage() {
     setLoading(true);
     try {
       const response = await axiosClient.get('/products');
-      setProducts(response.data);
+      // Sắp xếp theo ID tăng dần (thấp → cao)
+      setProducts([...response.data].sort((a, b) => a.id - b.id));
     } catch (error) {
       message.error('Lỗi tải sản phẩm');
       console.error(error);
@@ -101,7 +136,8 @@ export default function ProductsPage() {
       const response = await axiosClient.get(
         `/products/search?keyword=${searchKeyword}`,
       );
-      setProducts(response.data);
+      // Sắp xếp theo ID tăng dần (thấp → cao)
+      setProducts([...response.data].sort((a, b) => a.id - b.id));
     } catch (error) {
       console.error(error);
     } finally {
@@ -138,6 +174,7 @@ export default function ProductsPage() {
       unit: product.unit,
       categoryId: product.categoryId,
       isActive: product.isActive,
+      isFeatured: product.isFeatured,
     });
 
     if (product.thumbnail) {
@@ -203,13 +240,14 @@ export default function ProductsPage() {
       const data = {
         name: values.name,
         description: values.description,
-        price: values.price,
-        stock: values.stock,
+        price: Number(values.price),
+        stock: Number(values.stock),
         unit: values.unit,
-        categoryId: values.categoryId,
+        categoryId: Number(values.categoryId),
         thumbnail: thumbnailUrl,
         images: imagesUrls,
         isActive: values.isActive ?? true,
+        isFeatured: values.isFeatured ?? false,
       };
 
       if (editingProduct) {
@@ -228,15 +266,34 @@ export default function ProductsPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    try {
-      await axiosClient.delete(`/products/${id}`);
-      message.success('Xóa sản phẩm thành công');
-      fetchProducts();
-    } catch (error) {
-      console.error(error);
-      message.error('Xóa thất bại');
-    }
+  const handleDelete = (id: number, name: string) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa sản phẩm',
+      icon: <ExclamationCircleFilled style={{ color: '#ff4d4f' }} />,
+      content: (
+        <div style={{ fontSize: 14, color: '#595959', marginTop: 4 }}>
+          Bạn có chắc chắn muốn xóa sản phẩm{' '}
+          <span style={{ fontWeight: 700, color: '#262626' }}>"{name}"</span>?
+          <br />
+          Hành động này không thể hoàn tác.
+        </div>
+      ),
+      okText: 'Xóa',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      centered: true,
+      async onOk() {
+        try {
+          await axiosClient.delete(`/products/${id}`);
+          message.success('Xóa sản phẩm thành công');
+          fetchProducts();
+        } catch (error) {
+          console.error(error);
+          message.error('Xóa thất bại');
+          throw error;
+        }
+      },
+    });
   };
 
   const columns = [
@@ -244,7 +301,10 @@ export default function ProductsPage() {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
-      width: 60,
+      width: 70,
+      render: (id: number) => (
+        <span style={{ fontWeight: 700, color: '#1677ff' }}>#{id}</span>
+      ),
     },
     {
       title: 'Ảnh',
@@ -255,21 +315,21 @@ export default function ProductsPage() {
         thumbnail ? (
           <Image
             src={`${API_URL}${thumbnail}`}
-            width={50}
-            height={50}
-            style={{ objectFit: 'cover', borderRadius: 8 }}
+            width={52}
+            height={52}
+            style={{ objectFit: 'cover', borderRadius: 10 }}
           />
         ) : (
           <div
             style={{
-              width: 50,
-              height: 50,
-              background: '#f0f0f0',
-              borderRadius: 8,
+              width: 52,
+              height: 52,
+              background: '#f5f5f5',
+              borderRadius: 10,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#999',
+              color: '#bfbfbf',
               fontSize: 10,
             }}
           >
@@ -282,6 +342,9 @@ export default function ProductsPage() {
       dataIndex: 'name',
       key: 'name',
       ellipsis: true,
+      render: (name: string) => (
+        <span style={{ fontWeight: 600, color: '#262626' }}>{name}</span>
+      ),
     },
     {
       title: 'Danh mục',
@@ -296,16 +359,19 @@ export default function ProductsPage() {
       dataIndex: 'price',
       key: 'price',
       width: 120,
-      render: (price: number) =>
-        Number(price).toLocaleString('vi-VN') + 'đ',
+      render: (price: number) => (
+        <span style={{ color: '#f5222d', fontWeight: 700 }}>
+          {Number(price).toLocaleString('vi-VN')}đ
+        </span>
+      ),
     },
     {
       title: 'Tồn kho',
       dataIndex: 'stock',
       key: 'stock',
-      width: 90,
+      width: 100,
       render: (stock: number, record: Product) => (
-        <span style={{ color: stock <= 10 ? 'red' : 'inherit' }}>
+        <span style={{ color: stock <= 10 ? '#f5222d' : '#262626', fontWeight: 500 }}>
           {stock} {record.unit}
         </span>
       ),
@@ -314,12 +380,20 @@ export default function ProductsPage() {
       title: 'Trạng thái',
       dataIndex: 'isActive',
       key: 'isActive',
+      width: 120,
+      render: (isActive: boolean) => <StatusBadge active={isActive} />,
+    },
+    {
+      title: 'Nổi bật',
+      dataIndex: 'isFeatured',
+      key: 'isFeatured',
       width: 100,
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'green' : 'red'}>
-          {isActive ? 'Hiển thị' : 'Ẩn'}
-        </Tag>
-      ),
+      render: (isFeatured: boolean) =>
+        isFeatured ? (
+          <Tag color="gold" style={{ fontWeight: 600 }}>⭐ Nổi bật</Tag>
+        ) : (
+          <span style={{ color: '#bfbfbf', fontSize: 13 }}>—</span>
+        ),
     },
     {
       title: 'Thao tác',
@@ -327,23 +401,23 @@ export default function ProductsPage() {
       width: 120,
       render: (_: unknown, record: Product) => (
         <Space>
-          <Button
-            type="primary"
-            ghost
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => handleEdit(record)}
-          />
-          <Popconfirm
-            title="Xóa sản phẩm?"
-            description="Bạn có chắc chắn muốn xóa sản phẩm này?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-          >
-            <Button danger icon={<DeleteOutlined />} size="small" />
-          </Popconfirm>
+          <Tooltip title="Chỉnh sửa">
+            <Button
+              type="primary"
+              ghost
+              icon={<EditOutlined />}
+              size="small"
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Xóa">
+            <Button
+              danger
+              icon={<DeleteOutlined />}
+              size="small"
+              onClick={() => handleDelete(record.id, record.name)}
+            />
+          </Tooltip>
         </Space>
       ),
     },
@@ -355,47 +429,85 @@ export default function ProductsPage() {
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 24,
+          alignItems: 'flex-start',
+          marginBottom: 20,
+          flexWrap: 'wrap',
+          gap: 12,
         }}
       >
-        <h2 style={{ margin: 0 }}>Quản lý sản phẩm</h2>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1a1a1a' }}>
+            Quản lý sản phẩm
+          </h2>
+          <p style={{ margin: '4px 0 0', color: '#8c8c8c', fontSize: 14 }}>
+            Quản lý các sản phẩm trái cây trong cửa hàng
+          </p>
+        </div>
+        <Button
+          type="primary"
+          icon={<PlusOutlined />}
+          onClick={handleAdd}
+          style={{ borderRadius: 8, fontWeight: 600 }}
+        >
           Thêm sản phẩm
         </Button>
       </div>
 
-      <div style={{ marginBottom: 16 }}>
-        <Space>
-          <Input
-            placeholder="Tìm kiếm sản phẩm..."
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            onPressEnter={handleSearch}
-            style={{ width: 300 }}
-            prefix={<SearchOutlined />}
-            allowClear
-            onClear={() => {
-              setSearchKeyword('');
-              fetchProducts();
-            }}
-          />
-          <Button type="primary" onClick={handleSearch}>
-            Tìm kiếm
-          </Button>
-        </Space>
+      {/* ── BẢNG trong card ── */}
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 14,
+          border: '1px solid #f0f0f0',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+          padding: 20,
+        }}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Space>
+            <Input
+              placeholder="Tìm kiếm sản phẩm..."
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              onPressEnter={handleSearch}
+              style={{ width: 300, borderRadius: 8 }}
+              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+              allowClear
+              onClear={() => {
+                setSearchKeyword('');
+                fetchProducts();
+              }}
+            />
+            <Button type="primary" onClick={handleSearch} style={{ borderRadius: 8 }}>
+              Tìm kiếm
+            </Button>
+          </Space>
+        </div>
+
+        <Table
+          columns={columns}
+          dataSource={products}
+          rowKey="id"
+          loading={loading}
+          scroll={{ x: 900 }}
+          rowClassName={() => 'prod-row'}
+          pagination={{
+            pageSize: 10,
+            showTotal: (total) => `Tổng ${total} sản phẩm`,
+          }}
+        />
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={products}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          pageSize: 10,
-          showTotal: (total) => `Tổng ${total} sản phẩm`,
-        }}
-      />
+      <style>{`
+        .prod-row > td { padding-top: 14px !important; padding-bottom: 14px !important; }
+        .ant-table-thead > tr > th {
+          background: #fafafa !important;
+          color: #595959 !important;
+          font-weight: 700 !important;
+          border-bottom: 1px solid #f0f0f0 !important;
+        }
+        .prod-row:hover > td { background: #fafffe !important; }
+      `}</style>
 
       <Modal
         title={editingProduct ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}
@@ -544,14 +656,28 @@ export default function ProductsPage() {
             </Col>
           </Row>
 
-          <Form.Item
-            name="isActive"
-            label="Trạng thái"
-            valuePropName="checked"
-            initialValue={true}
-          >
-            <Switch checkedChildren="Hiển thị" unCheckedChildren="Ẩn" />
-          </Form.Item>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="isActive"
+                label="Trạng thái"
+                valuePropName="checked"
+                initialValue={true}
+              >
+                <Switch checkedChildren="Hiển thị" unCheckedChildren="Ẩn" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="isFeatured"
+                label="Sản phẩm nổi bật"
+                valuePropName="checked"
+                initialValue={false}
+              >
+                <Switch checkedChildren="Nổi bật" unCheckedChildren="Thường" />
+              </Form.Item>
+            </Col>
+          </Row>
         </Form>
       </Modal>
     </div>

@@ -8,16 +8,16 @@ import {
   Switch,
   Space,
   message,
-  Popconfirm,
   Image,
   Upload,
-  Tag,
+  Tooltip,
 } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   UploadOutlined,
+  ExclamationCircleFilled,
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 import axiosClient from '../api/axiosClient';
@@ -31,7 +31,40 @@ interface Category {
   createdAt: string;
 }
 
-const API_URL = 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
+function StatusBadge({ active }: { active: boolean }) {
+  const s = active
+    ? { bg: '#f6ffed', text: '#389e0d', dot: '#52c41a', label: 'Hiển thị' }
+    : { bg: '#fff1f0', text: '#cf1322', dot: '#ff4d4f', label: 'Ẩn' };
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        background: s.bg,
+        color: s.text,
+        padding: '4px 12px',
+        borderRadius: 20,
+        fontSize: 12,
+        fontWeight: 600,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: s.dot,
+          display: 'inline-block',
+        }}
+      />
+      {s.label}
+    </span>
+  );
+}
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -45,7 +78,8 @@ export default function CategoriesPage() {
     setLoading(true);
     try {
       const response = await axiosClient.get('/categories');
-      setCategories(response.data);
+      // Sắp xếp theo ID tăng dần (thấp → cao)
+      setCategories([...response.data].sort((a, b) => a.id - b.id));
     } catch (error) {
       message.error('Lỗi tải danh mục');
       console.error(error);
@@ -137,15 +171,34 @@ export default function CategoriesPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    try {
-      await axiosClient.delete(`/categories/${id}`);
-      message.success('Xóa danh mục thành công');
-      fetchCategories();
-    } catch (error) {
-      console.error(error);
-      message.error('Xóa thất bại. Danh mục có thể đang chứa sản phẩm');
-    }
+  const handleDelete = (id: number, name: string) => {
+    Modal.confirm({
+      title: 'Xác nhận xóa danh mục',
+      icon: <ExclamationCircleFilled style={{ color: '#ff4d4f' }} />,
+      content: (
+        <div style={{ fontSize: 14, color: '#595959', marginTop: 4 }}>
+          Bạn có chắc chắn muốn xóa danh mục{' '}
+          <span style={{ fontWeight: 700, color: '#262626' }}>"{name}"</span>?
+          <br />
+          Hành động này không thể hoàn tác.
+        </div>
+      ),
+      okText: 'Xóa',
+      cancelText: 'Hủy',
+      okButtonProps: { danger: true },
+      centered: true,
+      async onOk() {
+        try {
+          await axiosClient.delete(`/categories/${id}`);
+          message.success('Xóa danh mục thành công');
+          fetchCategories();
+        } catch (error) {
+          console.error(error);
+          message.error('Xóa thất bại. Danh mục có thể đang chứa sản phẩm');
+          throw error;
+        }
+      },
+    });
   };
 
   const columns = [
@@ -153,7 +206,10 @@ export default function CategoriesPage() {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
-      width: 60,
+      width: 70,
+      render: (id: number) => (
+        <span style={{ fontWeight: 700, color: '#1677ff' }}>#{id}</span>
+      ),
     },
     {
       title: 'Hình ảnh',
@@ -164,22 +220,22 @@ export default function CategoriesPage() {
         image ? (
           <Image
             src={`${API_URL}${image}`}
-            width={60}
-            height={60}
-            style={{ objectFit: 'cover', borderRadius: 8 }}
+            width={56}
+            height={56}
+            style={{ objectFit: 'cover', borderRadius: 10 }}
           />
         ) : (
           <div
             style={{
-              width: 60,
-              height: 60,
-              background: '#f0f0f0',
-              borderRadius: 8,
+              width: 56,
+              height: 56,
+              background: '#f5f5f5',
+              borderRadius: 10,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: '#999',
-              fontSize: 12,
+              color: '#bfbfbf',
+              fontSize: 11,
             }}
           >
             No img
@@ -190,58 +246,60 @@ export default function CategoriesPage() {
       title: 'Tên danh mục',
       dataIndex: 'name',
       key: 'name',
+      render: (name: string) => (
+        <span style={{ fontWeight: 600, color: '#262626' }}>{name}</span>
+      ),
     },
     {
       title: 'Mô tả',
       dataIndex: 'description',
       key: 'description',
       ellipsis: true,
+      render: (desc: string) => (
+        <span style={{ color: '#595959' }}>{desc || '—'}</span>
+      ),
     },
     {
       title: 'Trạng thái',
       dataIndex: 'isActive',
       key: 'isActive',
-      width: 120,
-      render: (isActive: boolean) => (
-        <Tag color={isActive ? 'green' : 'red'}>
-          {isActive ? 'Hiển thị' : 'Ẩn'}
-        </Tag>
-      ),
+      width: 130,
+      render: (isActive: boolean) => <StatusBadge active={isActive} />,
     },
     {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 120,
-      render: (date: string) => new Date(date).toLocaleDateString('vi-VN'),
+      render: (date: string) => (
+        <span style={{ color: '#595959' }}>
+          {new Date(date).toLocaleDateString('vi-VN')}
+        </span>
+      ),
     },
     {
       title: 'Thao tác',
       key: 'action',
-      width: 150,
+      width: 130,
       render: (_: unknown, record: Category) => (
         <Space>
-          <Button
-            type="primary"
-            ghost
-            icon={<EditOutlined />}
-            size="small"
-            onClick={() => handleEdit(record)}
-          />
-          <Popconfirm
-            title="Xóa danh mục?"
-            description="Bạn có chắc chắn muốn xóa danh mục này?"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-          >
+          <Tooltip title="Chỉnh sửa">
+            <Button
+              type="primary"
+              ghost
+              icon={<EditOutlined />}
+              size="small"
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          <Tooltip title="Xóa">
             <Button
               danger
               icon={<DeleteOutlined />}
               size="small"
+              onClick={() => handleDelete(record.id, record.name)}
             />
-          </Popconfirm>
+          </Tooltip>
         </Space>
       ),
     },
@@ -253,30 +311,63 @@ export default function CategoriesPage() {
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 24,
+          alignItems: 'flex-start',
+          marginBottom: 20,
+          flexWrap: 'wrap',
+          gap: 12,
         }}
       >
-        <h2 style={{ margin: 0 }}>Quản lý danh mục</h2>
+        <div>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: '#1a1a1a' }}>
+            Quản lý danh mục
+          </h2>
+          <p style={{ margin: '4px 0 0', color: '#8c8c8c', fontSize: 14 }}>
+            Quản lý các danh mục trái cây trong cửa hàng
+          </p>
+        </div>
         <Button
           type="primary"
           icon={<PlusOutlined />}
           onClick={handleAdd}
+          style={{ borderRadius: 8, fontWeight: 600 }}
         >
           Thêm danh mục
         </Button>
       </div>
 
-      <Table
-        columns={columns}
-        dataSource={categories}
-        rowKey="id"
-        loading={loading}
-        pagination={{
-          pageSize: 10,
-          showTotal: (total) => `Tổng ${total} danh mục`,
+      {/* ── BẢNG trong card ── */}
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 14,
+          border: '1px solid #f0f0f0',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+          padding: 20,
         }}
-      />
+      >
+        <Table
+          columns={columns}
+          dataSource={categories}
+          rowKey="id"
+          loading={loading}
+          rowClassName={() => 'cat-row'}
+          pagination={{
+            pageSize: 10,
+            showTotal: (total) => `Tổng ${total} danh mục`,
+          }}
+        />
+      </div>
+
+      <style>{`
+        .cat-row > td { padding-top: 14px !important; padding-bottom: 14px !important; }
+        .ant-table-thead > tr > th {
+          background: #fafafa !important;
+          color: #595959 !important;
+          font-weight: 700 !important;
+          border-bottom: 1px solid #f0f0f0 !important;
+        }
+        .cat-row:hover > td { background: #fafffe !important; }
+      `}</style>
 
       <Modal
         title={editingCategory ? 'Chỉnh sửa danh mục' : 'Thêm danh mục mới'}
@@ -297,10 +388,7 @@ export default function CategoriesPage() {
           </Form.Item>
 
           <Form.Item name="description" label="Mô tả">
-            <Input.TextArea
-              rows={3}
-              placeholder="Mô tả ngắn về danh mục"
-            />
+            <Input.TextArea rows={3} placeholder="Mô tả ngắn về danh mục" />
           </Form.Item>
 
           <Form.Item label="Hình ảnh">
@@ -327,10 +415,7 @@ export default function CategoriesPage() {
             valuePropName="checked"
             initialValue={true}
           >
-            <Switch
-              checkedChildren="Hiển thị"
-              unCheckedChildren="Ẩn"
-            />
+            <Switch checkedChildren="Hiển thị" unCheckedChildren="Ẩn" />
           </Form.Item>
         </Form>
       </Modal>
