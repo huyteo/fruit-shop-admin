@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Table, Tag, Button, message, Avatar, Popconfirm } from 'antd';
-import { UserOutlined, LockOutlined, UnlockOutlined } from '@ant-design/icons';
+import { Table, Tag, Button, message, Avatar, Modal } from 'antd';
+import { UserOutlined, LockOutlined, UnlockOutlined, ExclamationCircleFilled  } from '@ant-design/icons';
 import axiosClient from '../api/axiosClient';
 import { getImageUrl } from '../utils/image';
 
@@ -38,21 +38,52 @@ export default function UsersPage() {
     fetchUsers();
   }, []);
 
-  const handleToggleActive = async (user: User) => {
-    try {
-      await axiosClient.put(`/users/${user.id}/toggle-active`);
-      message.success(
-        user.isActive
-          ? `Đã khóa tài khoản "${user.name}"`
-          : `Đã mở khóa tài khoản "${user.name}"`,
-      );
-      fetchUsers();
-    } catch (error) {
-      message.error('Thao tác thất bại');
-      console.error(error);
-    }
-  };
+  const handleToggleActive = (user: User) => {
+  const isLocking = user.isActive;
 
+  Modal.confirm({
+    title: isLocking ? 'Khóa tài khoản này?' : 'Mở khóa tài khoản này?',
+    icon: <ExclamationCircleFilled style={{ color: isLocking ? '#ff4d4f' : '#1677ff' }} />,
+    content: (
+      <div style={{ fontSize: 14, color: '#595959', marginTop: 4 }}>
+        {isLocking ? (
+          <>
+            Bạn có chắc chắn muốn khóa tài khoản{' '}
+            <span style={{ fontWeight: 700, color: '#262626' }}>"{user.name}"</span>?
+            <br />
+            Người dùng sẽ không thể đăng nhập.
+          </>
+        ) : (
+          <>
+            Bạn có chắc chắn muốn mở khóa tài khoản{' '}
+            <span style={{ fontWeight: 700, color: '#262626' }}>"{user.name}"</span>?
+            <br />
+            Người dùng sẽ có thể đăng nhập lại.
+          </>
+        )}
+      </div>
+    ),
+    okText: isLocking ? 'Khóa' : 'Mở khóa',
+    cancelText: 'Hủy',
+    okButtonProps: { danger: isLocking },
+    centered: true,
+    async onOk() {
+      try {
+        await axiosClient.put(`/users/${user.id}/toggle-active`);
+        message.success(
+          isLocking
+            ? `Đã khóa tài khoản "${user.name}"`
+            : `Đã mở khóa tài khoản "${user.name}"`,
+        );
+        fetchUsers();
+      } catch (error) {
+        message.error('Thao tác thất bại');
+        console.error(error);
+        throw error; // để Modal hiển thị trạng thái lỗi
+      }
+    },
+  });
+};
   const columns = [
     {
       title: 'ID',
@@ -127,32 +158,16 @@ export default function UsersPage() {
           return <Tag>Admin</Tag>;
         }
 
-        return (
-          <Popconfirm
-            title={
-              record.isActive
-                ? 'Khóa tài khoản này?'
-                : 'Mở khóa tài khoản này?'
-            }
-            description={
-              record.isActive
-                ? 'Người dùng sẽ không thể đăng nhập'
-                : 'Người dùng sẽ có thể đăng nhập lại'
-            }
-            onConfirm={() => handleToggleActive(record)}
-            okText={record.isActive ? 'Khóa' : 'Mở khóa'}
-            cancelText="Hủy"
-            okButtonProps={{ danger: record.isActive }}
+         return (
+          <Button
+            type={record.isActive ? 'default' : 'primary'}
+            danger={record.isActive}
+            icon={record.isActive ? <LockOutlined /> : <UnlockOutlined />}
+            size="small"
+            onClick={() => handleToggleActive(record)}
           >
-            <Button
-              type={record.isActive ? 'default' : 'primary'}
-              danger={record.isActive}
-              icon={record.isActive ? <LockOutlined /> : <UnlockOutlined />}
-              size="small"
-            >
-              {record.isActive ? 'Khóa' : 'Mở khóa'}
-            </Button>
-          </Popconfirm>
+            {record.isActive ? 'Khóa' : 'Mở khóa'}
+          </Button>
         );
       },
     },

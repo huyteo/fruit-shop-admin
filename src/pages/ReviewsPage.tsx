@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Table, Tag, Button, message, Popconfirm, Rate, Space } from 'antd';
-import { DeleteOutlined } from '@ant-design/icons';
+import { Table, Tag, Button, message, Rate, Modal } from 'antd';
+import { DeleteOutlined, ExclamationCircleFilled } from '@ant-design/icons';
 import axiosClient from '../api/axiosClient';
 
 interface Review {
@@ -40,16 +40,37 @@ export default function ReviewsPage() {
     fetchReviews();
   }, []);
 
-  const handleDelete = async (id: number) => {
-    try {
-      await axiosClient.delete(`/reviews/${id}`);
-      message.success('Xóa đánh giá thành công');
-      fetchReviews();
-    } catch (error) {
-      message.error('Xóa thất bại');
-      console.error(error);
-    }
-  };
+  const handleDelete = (id: number, userName: string, productName: string) => {
+  Modal.confirm({
+    title: 'Xác nhận xóa đánh giá',
+    icon: <ExclamationCircleFilled style={{ color: '#ff4d4f' }} />,
+    content: (
+      <div style={{ fontSize: 14, color: '#595959', marginTop: 4 }}>
+        Bạn có chắc chắn muốn xóa đánh giá của{' '}
+        <span style={{ fontWeight: 700, color: '#262626' }}>"{userName}"</span>{' '}
+        về sản phẩm{' '}
+        <span style={{ fontWeight: 700, color: '#262626' }}>"{productName}"</span>?
+        <br />
+        Hành động này không thể hoàn tác.
+      </div>
+    ),
+    okText: 'Xóa',
+    cancelText: 'Hủy',
+    okButtonProps: { danger: true },
+    centered: true,
+    async onOk() {
+      try {
+        await axiosClient.delete(`/reviews/${id}`);
+        message.success('Xóa đánh giá thành công');
+        fetchReviews();
+      } catch (error) {
+        message.error('Xóa thất bại');
+        console.error(error);
+        throw error;
+      }
+    },
+  });
+};
 
   const columns = [
     {
@@ -104,24 +125,18 @@ export default function ReviewsPage() {
         new Date(date).toLocaleDateString('vi-VN'),
     },
     {
-      title: 'Thao tác',
-      key: 'action',
-      width: 100,
-      render: (_: unknown, record: Review) => (
-        <Space>
-          <Popconfirm
-            title="Xóa đánh giá này?"
-            description="Hành động này không thể hoàn tác"
-            onConfirm={() => handleDelete(record.id)}
-            okText="Xóa"
-            cancelText="Hủy"
-            okButtonProps={{ danger: true }}
-          >
-            <Button danger icon={<DeleteOutlined />} size="small" />
-          </Popconfirm>
-        </Space>
-      ),
-    },
+  title: 'Thao tác',
+  key: 'action',
+  width: 100,
+  render: (_: unknown, record: Review) => (
+    <Button
+      danger
+      icon={<DeleteOutlined />}
+      size="small"
+      onClick={() => handleDelete(record.id, record.user?.name, record.product?.name)}
+    />
+  ),
+},
   ];
 
   return (
